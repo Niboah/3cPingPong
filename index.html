@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>3cPingPong</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body style="margin:0px">
+    <h1 id="player" style="position: absolute;
+    top: 10px;
+    width: 100%;
+    text-align: left;
+    z-index: 100;
+    display:block;
+    color:azure">3colorPingPong</h1>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      const COLOR1 =0xff0000;
+      const COLOR2 =0xff66ff;
+      const COLOR3 =0x009933;
+      const BALL_COLOR = 0x00ff00;
+      const PADDLE_COLOR = 0xffc0cb;
+      const PADDLE_COLOR2 = 0xff0000;
+    </script>
+    <script type="module">
+      var socket = io();
+      var player2 =false;
+      
+      var scene = new THREE.Scene();
+      var player = "";
+      var yrotate=0;
+      socket.on('join', msg => {
+        
+        player=msg;
+        if(player=="player2"){
+          yrotate=Math.PI;
+          player2=true;
+        }else yrotate=0;
+        scene.rotation.set(-70*(Math.PI/180),0,yrotate);
+      });
+      
+      
+      scene.rotation.set(-70*(Math.PI/180),0,yrotate);
+
+      var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0,0,12);
+      var renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      document.body.appendChild(renderer.domElement);
+  
+      var geometryTable = new THREE.BoxGeometry(12,15,0);
+      var geometryBall = new THREE.SphereGeometry(1, 30, 30);
+      var geometryBox = new THREE.BoxGeometry(1, 1, 1);
+  
+      var materialTable = new THREE.MeshBasicMaterial({ color: 0x123213 });
+      var materialBall = new THREE.MeshBasicMaterial({ color: BALL_COLOR });
+      var materialBox = new THREE.MeshBasicMaterial({ color: PADDLE_COLOR});
+      var materialBox2 = new THREE.MeshBasicMaterial({ color: PADDLE_COLOR2});
+  
+      var table = new THREE.Mesh(geometryTable, materialTable);
+      table.position.set(0, 0, -0.20);
+      scene.add(table);
+  
+      var paddleA = new THREE.Mesh(geometryBox, materialBox);
+      paddleA.position.set(0, -7, 0);
+      paddleA.scale.set(2.5, 0.25, 0.25);
+      scene.add(paddleA);
+  
+      var paddleB = new THREE.Mesh(geometryBox, materialBox2);
+      paddleB.position.set(0, 7, 0);
+      paddleB.scale.set(2.5, 0.25, 0.25);
+      scene.add(paddleB);
+
+      var ball = new THREE.Mesh(geometryBall, materialBall);
+      ball.position.set(0, 0, 0);
+      ball.scale.set(0.25, 0.25, 0.25);
+      scene.add(ball);
+
+      var ballSpeedX = -0.05;
+      var ballSpeedY = 0.05;
+
+      function moveBall() {
+          var pixelPosition = new THREE.Vector3();
+          pixelPosition.copy(ball).project(camera);
+  
+          // Convert the pixel coordinates to screen coordinates
+          var x = (pixelPosition.x + 1) / 2 * window.innerWidth;
+          var y = (-pixelPosition.y + 1) / 2 * window.innerHeight;
+  
+          var ballX = ball.position.x;
+          var ballY = ball.position.y;
+  
+          // Check for collisions with the walls
+          // Convert position to pixel
+  
+          var pixelPosition = new THREE.Vector3();
+          pixelPosition.copy(ball.position).project(camera);
+          var x = (pixelPosition.x + 1) / 2 * window.innerWidth;
+          var y = (pixelPosition.y + 1) / 2 * window.innerHeight;
+  
+          if (x > window.innerWidth/3 * 2 || x < window.innerWidth/3 ) {
+              ballSpeedX = -ballSpeedX;
+          }
+
+          if(ballY>10 || ballY<-10){
+            ball.position.set(0, 0, 0);
+            socket.emit('ballout', mouseX);
+          }
+          
+          var changeColor =false;
+          // Check for collisions with the paddles
+          if (ballY > paddleA.position.y - 1.5 && ballY < paddleA.position.y + 0.5 && ballX > paddleA.position.x - 1 && ballX < paddleA.position.x + 1) {
+              ballSpeedY = Math.abs(ballSpeedY);
+              ball.position.set(ball.position.x, -6, 0);
+              changeColor=true;
+          }
+          if(ballY > paddleB.position.y - 0.5 && ballY < paddleB.position.y + 1.5 && ballX > paddleB.position.x - 1 && ballX < paddleB.position.x + 1){
+              ballSpeedY = -Math.abs(ballSpeedY);
+              ball.position.set(ball.position.x, 6, 0);
+              changeColor=true;
+          }
+          if(changeColor){
+            var color = Math.floor(Math.random() * 3);
+            switch (color){
+              case 0:
+                materialTable.color.setHex(COLOR1);
+                break;
+              case 1:
+                materialTable.color.setHex(COLOR2);
+                break;
+              case 2:
+                materialTable.color.setHex(COLOR3);
+                break;
+              default:
+            }
+          }
+  
+          // Move the ball to its new position
+          ball.position.x += ballSpeedX;
+          ball.position.y += ballSpeedY;
+          if(!player2)paddleB.position.x=ball.position.x;
+          //paddleA.position.x=ball.position.x;
+          if(player=="player1"){
+            socket.emit('ballx', ball.position.x);
+            socket.emit('bally', ball.position.y);
+          }
+      }
+
+      var rotateScene=false;
+
+      // Handle keyboard events
+      function handleKeyDown(event) {
+          var keyCode = event.keyCode;
+          if (keyCode == 39) {
+              paddleA.position.x += 0.3;
+              var pixelPosition = new THREE.Vector3();
+              pixelPosition.copy(paddleA.position).project(camera);
+              // Convert the pixel coordinates to screen coordinates
+              var x = ((pixelPosition.x + 1) / 2) * window.innerWidth;
+              //var y = (-pixelPosition.y + 1) / 2 * window.innerHeight;
+              if(x > window.innerWidth/3 * 2) paddleA.position.x -= 0.3;
+          } else if (keyCode == 37) {
+              paddleA.position.x -= 0.3;
+              var pixelPosition = new THREE.Vector3();
+              pixelPosition.copy(paddleA.position).project(camera);
+              // Convert the pixel coordinates to screen coordinates
+              var x = (pixelPosition.x + 1) / 2 * window.innerWidth;
+              //var y = (-pixelPosition.y + 1) / 2 * window.innerHeight;
+              if(x < window.innerWidth/3) paddleA.position.x += 0.3;
+          } else if (keyCode == 32) {
+              ball.position.set(0, 0, -10);
+          }else if(keyCode == 81){
+            rotateScene= !rotateScene;
+              if(rotateScene){
+                  scene.rotation.set(-70 *(Math.PI/180),0,yrotate);
+              }else{
+                  scene.rotation.set(0,0,yrotate);
+              }
+          }
+  
+      }
+
+      document.addEventListener("keydown", handleKeyDown);
+  
+      function animate() {
+          requestAnimationFrame(animate);
+          moveBall();
+          renderer.render(scene, camera);
+      }
+
+      function movePaddle(event) {
+          var mouseX = event.clientX / window.innerWidth * 10 -5;
+          if (mouseX > 6)  mouseX = 6;
+          socket.emit('movePaddle', mouseX);
+      }
+
+      socket.on('player1', msg => {
+        paddleA.position.x=msg;
+      });
+      socket.on('player2', msg => {
+        paddleB.position.x=-msg;
+      });
+
+      socket.on('ballout', msg => {
+        ball.position.set(0, 0, 0);
+      });
+
+      socket.on('ballx', msg => {
+        ball.position.x=msg;
+      });
+      socket.on('bally', msg => {
+        ball.position.y=msg;
+      });
+  
+      window.addEventListener('resize', function() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+  
+      window.addEventListener('mousemove', function(event) {
+          movePaddle(event);
+      });
+
+      animate();
+    </script>
+  </body>
+</html>
