@@ -14,216 +14,200 @@
     color:azure">3colorPingPong</h1>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
     <script>
       const COLOR1 =0xff0000;
-      const COLOR2 =0xff66ff;
-      const COLOR3 =0x009933;
-      const BALL_COLOR = 0x00ff00;
-      const PADDLE_COLOR = 0xffc0cb;
-      const PADDLE_COLOR2 = 0xff0000;
+      const COLOR2 =0x00ff00;
+      const COLOR3 =0x0000ff;
+      const TABLE_COLOR=0xffffff;
+      const TABLE_WIDTH=12;
+      const TABLE_HEIGHT=14;
+      const BALL_COLOR = COLOR2;
+      const PADDLE_1_COLOR = COLOR1;
+      const PADDLE_2_COLOR = COLOR3;
+      
     </script>
+    
     <script type="module">
-      var socket = io();
-      var player2 =false;
-      
-      var scene = new THREE.Scene();
-      var player = "";
-      var yrotate=0;
-      socket.on('join', msg => {
-        
-        player=msg;
-        if(player=="player2"){
-          yrotate=Math.PI;
-          player2=true;
-        }else yrotate=0;
-        scene.rotation.set(-70*(Math.PI/180),0,yrotate);
-      });
-      
-      
-      scene.rotation.set(-70*(Math.PI/180),0,yrotate);
+      const socket = io();
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      const scene = new THREE.Scene();
+      scene.rotation.set(-70*(Math.PI/180),0,0);
 
-      var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.set(0,0,12);
-      var renderer = new THREE.WebGLRenderer();
+      const renderer = new THREE.WebGLRenderer();
       renderer.setSize(window.innerWidth, window.innerHeight);
 
       document.body.appendChild(renderer.domElement);
-  
-      var geometryTable = new THREE.BoxGeometry(12,15,0);
-      var geometryBall = new THREE.SphereGeometry(1, 30, 30);
-      var geometryBox = new THREE.BoxGeometry(1, 1, 1);
-  
-      var materialTable = new THREE.MeshBasicMaterial({ color: 0x123213 });
-      var materialBall = new THREE.MeshBasicMaterial({ color: BALL_COLOR });
-      var materialBox = new THREE.MeshBasicMaterial({ color: PADDLE_COLOR});
-      var materialBox2 = new THREE.MeshBasicMaterial({ color: PADDLE_COLOR2});
-  
-      var table = new THREE.Mesh(geometryTable, materialTable);
+
+      const geometryTable = new THREE.BoxGeometry(TABLE_WIDTH,TABLE_HEIGHT,0);
+      const geometryBall = new THREE.SphereGeometry(1, 30, 30);
+      const geometryBox = new THREE.BoxGeometry(2, 0.25, 0.25);
+
+      const materialTable = new THREE.MeshBasicMaterial({ color: TABLE_COLOR });
+      const materialBall = new THREE.MeshBasicMaterial({ color: BALL_COLOR });
+      const materialBox = new THREE.MeshBasicMaterial({ color: PADDLE_1_COLOR});
+      const materialBox2 = new THREE.MeshBasicMaterial({ color: PADDLE_2_COLOR});
+
+      const table = new THREE.Mesh(geometryTable, materialTable);
       table.position.set(0, 0, -0.20);
       scene.add(table);
-  
-      var paddleA = new THREE.Mesh(geometryBox, materialBox);
+
+      const paddleA = new THREE.Mesh(geometryBox, materialBox);
       paddleA.position.set(0, -7, 0);
-      paddleA.scale.set(2.5, 0.25, 0.25);
       scene.add(paddleA);
-  
-      var paddleB = new THREE.Mesh(geometryBox, materialBox2);
+
+      const paddleB = new THREE.Mesh(geometryBox, materialBox2);
       paddleB.position.set(0, 7, 0);
-      paddleB.scale.set(2.5, 0.25, 0.25);
       scene.add(paddleB);
 
-      var ball = new THREE.Mesh(geometryBall, materialBall);
+      const ball = new THREE.Mesh(geometryBall, materialBall);
       ball.position.set(0, 0, 0);
       ball.scale.set(0.25, 0.25, 0.25);
       scene.add(ball);
-
-      var ballSpeedX = -0.05;
+      
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      var thisPlayer="";
+      var gamesStart = false;
+      var senX=-1;
+      var senY=-1;
+      var ballSpeedX = 0.05;
       var ballSpeedY = 0.05;
 
-      function moveBall() {
-          var pixelPosition = new THREE.Vector3();
-          pixelPosition.copy(ball).project(camera);
+      function moveBall(){  
+        if(!gamesStart) return;
+        var ballX = ball.position.x;
+        var ballY = ball.position.y;
   
-          // Convert the pixel coordinates to screen coordinates
-          var x = (pixelPosition.x + 1) / 2 * window.innerWidth;
-          var y = (-pixelPosition.y + 1) / 2 * window.innerHeight;
-  
-          var ballX = ball.position.x;
-          var ballY = ball.position.y;
-  
-          // Check for collisions with the walls
-          // Convert position to pixel
-  
-          var pixelPosition = new THREE.Vector3();
-          pixelPosition.copy(ball.position).project(camera);
-          var x = (pixelPosition.x + 1) / 2 * window.innerWidth;
-          var y = (pixelPosition.y + 1) / 2 * window.innerHeight;
-  
-          if (x > window.innerWidth/3 * 2 || x < window.innerWidth/3 ) {
-              ballSpeedX = -ballSpeedX;
-          }
+        if (ballX > TABLE_WIDTH/2 || ballX < -TABLE_WIDTH/2 ) {
+          senX = -senX;
+        }
 
-          if(ballY>10 || ballY<-10){
-            ball.position.set(0, 0, 0);
-            socket.emit('ballout', mouseX);
-          }
-          
-          var changeColor =false;
-          // Check for collisions with the paddles
-          if (ballY > paddleA.position.y - 1.5 && ballY < paddleA.position.y + 0.5 && ballX > paddleA.position.x - 1 && ballX < paddleA.position.x + 1) {
-              ballSpeedY = Math.abs(ballSpeedY);
-              ball.position.set(ball.position.x, -6, 0);
-              changeColor=true;
-          }
-          if(ballY > paddleB.position.y - 0.5 && ballY < paddleB.position.y + 1.5 && ballX > paddleB.position.x - 1 && ballX < paddleB.position.x + 1){
-              ballSpeedY = -Math.abs(ballSpeedY);
-              ball.position.set(ball.position.x, 6, 0);
-              changeColor=true;
-          }
-          if(changeColor){
-            var color = Math.floor(Math.random() * 3);
-            switch (color){
-              case 0:
-                materialTable.color.setHex(COLOR1);
-                break;
-              case 1:
-                materialTable.color.setHex(COLOR2);
-                break;
-              case 2:
-                materialTable.color.setHex(COLOR3);
-                break;
-              default:
-            }
-          }
-  
+        if(ballY>TABLE_HEIGHT+1/2){
+          ballSpeedY=0.04;
+          ball.position.set(0, 0, 0);
+          socket.emit("resetPoint",senY);
+        }
+
+        if(ballY<-TABLE_HEIGHT+1/2){
+          ballSpeedY=0.04;
+          ball.position.set(0, 0, 0);
+          socket.emit("resetPoint",senY);
+        }
+
+        // Check for collisions with the paddles
+        if (ballY > paddleA.position.y - 0.5 && ballY < paddleA.position.y + 0.5 && ballX > paddleA.position.x - 1 && ballX < paddleA.position.x + 1) {
+            senY = 1;
+            ballSpeedX+=0.001;
+            ball.position.set(ball.position.x, -6, 0);
+            socket.emit("color","");
+        }
+        if(ballY > paddleB.position.y - 0.5 && ballY < paddleB.position.y + 0.5 && ballX > paddleB.position.x - 1 && ballX < paddleB.position.x + 1){
+            senY = -1;
+            ballSpeedY+=0.001;
+            ball.position.set(ball.position.x, 6, 0);
+            socket.emit("color","");
+        }  
           // Move the ball to its new position
-          ball.position.x += ballSpeedX;
-          ball.position.y += ballSpeedY;
-          if(!player2)paddleB.position.x=ball.position.x;
-          //paddleA.position.x=ball.position.x;
-          if(player=="player1"){
-            socket.emit('ballx', ball.position.x);
-            socket.emit('bally', ball.position.y);
-          }
+          ball.position.x += (ballSpeedX*senX);
+          ball.position.y += (ballSpeedY*senY);
       }
 
-      var rotateScene=false;
-
-      // Handle keyboard events
-      function handleKeyDown(event) {
-          var keyCode = event.keyCode;
-          if (keyCode == 39) {
-              paddleA.position.x += 0.3;
-              var pixelPosition = new THREE.Vector3();
-              pixelPosition.copy(paddleA.position).project(camera);
-              // Convert the pixel coordinates to screen coordinates
-              var x = ((pixelPosition.x + 1) / 2) * window.innerWidth;
-              //var y = (-pixelPosition.y + 1) / 2 * window.innerHeight;
-              if(x > window.innerWidth/3 * 2) paddleA.position.x -= 0.3;
-          } else if (keyCode == 37) {
-              paddleA.position.x -= 0.3;
-              var pixelPosition = new THREE.Vector3();
-              pixelPosition.copy(paddleA.position).project(camera);
-              // Convert the pixel coordinates to screen coordinates
-              var x = (pixelPosition.x + 1) / 2 * window.innerWidth;
-              //var y = (-pixelPosition.y + 1) / 2 * window.innerHeight;
-              if(x < window.innerWidth/3) paddleA.position.x += 0.3;
-          } else if (keyCode == 32) {
-              ball.position.set(0, 0, -10);
-          }else if(keyCode == 81){
-            rotateScene= !rotateScene;
-              if(rotateScene){
-                  scene.rotation.set(-70 *(Math.PI/180),0,yrotate);
-              }else{
-                  scene.rotation.set(0,0,yrotate);
-              }
-          }
-  
-      }
-
-      document.addEventListener("keydown", handleKeyDown);
-  
       function animate() {
           requestAnimationFrame(animate);
           moveBall();
           renderer.render(scene, camera);
       }
 
+   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
       function movePaddle(event) {
-          var mouseX = event.clientX / window.innerWidth * 10 -5;
+          var mouseX = event.clientX / window.innerWidth * 10 - 5;
           if (mouseX > 6)  mouseX = 6;
-          socket.emit('movePaddle', mouseX);
+
+          if(thisPlayer=="Player2"){
+            paddleB.position.x=-mouseX;
+            socket.emit("paddleBPos",paddleB.position.x);
+          }else{
+            paddleA.position.x=mouseX;
+            socket.emit("paddleAPos",paddleA.position.x);
+          } 
       }
 
-      socket.on('player1', msg => {
-        paddleA.position.x=msg;
-      });
-      socket.on('player2', msg => {
-        paddleB.position.x=-msg;
+      window.addEventListener('touchstart', function(event) {
+        clientX = e.touches[0].clientX;
       });
 
-      socket.on('ballout', msg => {
-        ball.position.set(0, 0, 0);
+       window.addEventListener('mousemove', function(event) {
+          movePaddle(event);
       });
 
-      socket.on('ballx', msg => {
-        ball.position.x=msg;
-      });
-      socket.on('bally', msg => {
-        ball.position.y=msg;
-      });
-  
       window.addEventListener('resize', function() {
           camera.aspect = window.innerWidth / window.innerHeight;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
       });
-  
-      window.addEventListener('mousemove', function(event) {
-          movePaddle(event);
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      
+
+      socket.on('join', msg => {
+        alert(msg);
+        if(msg=="player2"){
+          scene.rotation.set(-70*(Math.PI/180),0,Math.PI);
+          thisPlayer="Player2"
+        }else thisPlayer="Player1";
+        document.getElementById("player").innerText=thisPlayer;
       });
 
-      animate();
+      socket.on('start', msg => {
+        gamesStart=true;
+        senX=-1;
+        senY=-1;
+        ballSpeedX=0.05;
+        ballSpeedY = 0.05;
+        animate();
+      })
+
+      socket.on('pause', msg => {
+        alert("pause");
+        location.href = window.location.href;
+        gamesStart=false;
+        animate();
+      });
+
+      socket.on('paddleAPos', msg => {
+        paddleA.position.x=msg;
+      }); 
+
+      socket.on('paddleBPos', msg => {
+        paddleB.position.x=msg;
+      }); 
+
+      socket.on('resetPoint', msg => {
+        ball.position.set(0, 0, 0);
+        senX=-1;
+        senY=-1;
+        ballSpeedX = 0.05;
+        ballSpeedY = 0.05;
+        materialTable.color.setHex(0xffffff);
+      });
+
+      socket.on('color', msg => {
+        switch (msg){
+          case 0:
+            materialTable.color.setHex(COLOR1);
+            break;
+          case 1:
+            materialTable.color.setHex(COLOR2);
+            break;
+          case 2:
+            materialTable.color.setHex(COLOR3);
+            break;
+          default:
+        }
+      }); 
     </script>
   </body>
 </html>
