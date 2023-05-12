@@ -85,6 +85,7 @@
       ball.scale.set(0.25, 0.25, 0.25);
       scene.add(ball);
       
+      renderer.render(scene, camera);
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       var thisPlayer="";
       var gamesStart = false;
@@ -116,13 +117,13 @@
 
         // Check for collisions with the paddles
         if (ballY > paddleA.position.z - 0.5 && ballY < paddleA.position.z + 0.5 && ballX > paddleA.position.x - 1 && ballX < paddleA.position.x + 1) {
-            senY = 1;
+            senY = -senY;
             ballSpeedX+=0.001;
             ball.position.set(ball.position.x, 0, 6);
             socket.emit("color","");
         }
         if(ballY > paddleB.position.z - 0.5 && ballY < paddleB.position.z + 0.5 && ballX > paddleB.position.x - 1 && ballX < paddleB.position.x + 1){
-            senY = -1;
+            senY = -senY;
             ballSpeedY+=0.001;
             ball.position.set(ball.position.x, 0, -6);
             socket.emit("color","");
@@ -130,6 +131,12 @@
           // Move the ball to its new position
           ball.position.x += (ballSpeedX*senX);
           ball.position.z += (ballSpeedY*senY);
+
+          if(thisPlayer=="Player2"){
+            paddleB.position.x=ball.position.x;
+            socket.emit("paddleBPos",ball.position.x);
+          }
+            
       }
 
       function animate() {
@@ -138,12 +145,7 @@
           renderer.render(scene, camera);
       }
 
-      gamesStart=true;
-        senX=-1;
-        senY=-1;
-        ballSpeedX=0.05;
-        ballSpeedY = -0.05;
-        animate();
+
    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
       function movePaddle(event) {
@@ -187,7 +189,7 @@
       window.addEventListener('resize', function() {
           ra = window.innerWidth / window.innerHeight;
           ifra();
-          //camera.fov=fov;
+          camera.fov=fov;
           camera.aspect = ra;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
@@ -251,7 +253,7 @@
             break;
           default:
         }
-        materialTable.color.setHex(0xffffff);
+        //materialTable.color.setHex(0xffffff);
       }); 
     </script>
   </body>
