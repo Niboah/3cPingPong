@@ -20,28 +20,46 @@
       const COLOR2 =0x00ff00;
       const COLOR3 =0x0000ff;
       const TABLE_COLOR=0xffffff;
-      const TABLE_WIDTH=12;
+      const TABLE_WIDTH=10;
+      const TABLE_Y=0.2;
       const TABLE_HEIGHT=14;
       const BALL_COLOR = COLOR2;
       const PADDLE_1_COLOR = COLOR1;
       const PADDLE_2_COLOR = COLOR3;
-      
+
+      const SCENE_X = 10;
+      const SCENE_Y = 1;
+      const SCENE_Z = 15;
+      const SCENE_R = Math.sqrt(SCENE_X*SCENE_X + SCENE_Y*SCENE_Y + SCENE_Z*SCENE_Z);
+
     </script>
     
     <script type="module">
       const socket = io();
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-      const scene = new THREE.Scene();
-      scene.rotation.set(-70*(Math.PI/180),0,0);
 
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.set(0,0,12);
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////    
+      //init Scene
+      const scene = new THREE.Scene();
+      var theta=Math.PI/4.0;
+      var psi=0.0;
+      viewTransform();      
+
+      //init Camera
+      var iniFov =2.0 * Math.asin(0.2);
+      var fov=Math.PI/4.0;
+      var ra=window.innerWidth / window.innerHeight;
+      var znear=SCENE_R;
+      var zfar=3 * SCENE_R;
+      ifra();
+      const camera = new THREE.PerspectiveCamera(fov, ra, znear, zfar);
+      
+      //add renderer to web page
       const renderer = new THREE.WebGLRenderer();
       renderer.setSize(window.innerWidth, window.innerHeight);
-
       document.body.appendChild(renderer.domElement);
 
-      const geometryTable = new THREE.BoxGeometry(TABLE_WIDTH,TABLE_HEIGHT,0);
+      //add objects
+      const geometryTable = new THREE.BoxGeometry(TABLE_WIDTH,TABLE_Y,TABLE_HEIGHT);
       const geometryBall = new THREE.SphereGeometry(1, 30, 30);
       const geometryBox = new THREE.BoxGeometry(2, 0.25, 0.25);
 
@@ -51,15 +69,15 @@
       const materialBox2 = new THREE.MeshBasicMaterial({ color: PADDLE_2_COLOR});
 
       const table = new THREE.Mesh(geometryTable, materialTable);
-      table.position.set(0, 0, -0.20);
+      table.position.set(0, -0.3, 0);
       scene.add(table);
 
       const paddleA = new THREE.Mesh(geometryBox, materialBox);
-      paddleA.position.set(0, -7, 0);
+      paddleA.position.set(0, 0, 7);
       scene.add(paddleA);
 
       const paddleB = new THREE.Mesh(geometryBox, materialBox2);
-      paddleB.position.set(0, 7, 0);
+      paddleB.position.set(0, 0, -7);
       scene.add(paddleB);
 
       const ball = new THREE.Mesh(geometryBall, materialBall);
@@ -78,7 +96,7 @@
       function moveBall(){  
         if(!gamesStart) return;
         var ballX = ball.position.x;
-        var ballY = ball.position.y;
+        var ballY = ball.position.z;
   
         if (ballX > TABLE_WIDTH/2 || ballX < -TABLE_WIDTH/2 ) {
           senX = -senX;
@@ -97,21 +115,21 @@
         }
 
         // Check for collisions with the paddles
-        if (ballY > paddleA.position.y - 0.5 && ballY < paddleA.position.y + 0.5 && ballX > paddleA.position.x - 1 && ballX < paddleA.position.x + 1) {
+        if (ballY > paddleA.position.z - 0.5 && ballY < paddleA.position.z + 0.5 && ballX > paddleA.position.x - 1 && ballX < paddleA.position.x + 1) {
             senY = 1;
             ballSpeedX+=0.001;
-            ball.position.set(ball.position.x, -6, 0);
+            ball.position.set(ball.position.x, 0, 6);
             socket.emit("color","");
         }
-        if(ballY > paddleB.position.y - 0.5 && ballY < paddleB.position.y + 0.5 && ballX > paddleB.position.x - 1 && ballX < paddleB.position.x + 1){
+        if(ballY > paddleB.position.z - 0.5 && ballY < paddleB.position.z + 0.5 && ballX > paddleB.position.x - 1 && ballX < paddleB.position.x + 1){
             senY = -1;
             ballSpeedY+=0.001;
-            ball.position.set(ball.position.x, 6, 0);
+            ball.position.set(ball.position.x, 0, -6);
             socket.emit("color","");
         }  
           // Move the ball to its new position
           ball.position.x += (ballSpeedX*senX);
-          ball.position.y += (ballSpeedY*senY);
+          ball.position.z += (ballSpeedY*senY);
       }
 
       function animate() {
@@ -120,11 +138,17 @@
           renderer.render(scene, camera);
       }
 
+      gamesStart=true;
+        senX=-1;
+        senY=-1;
+        ballSpeedX=0.05;
+        ballSpeedY = -0.05;
+        animate();
    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
       function movePaddle(event) {
           var mouseX = event.clientX / window.innerWidth * 10 - 5;
-          if (mouseX > 6)  mouseX = 6;
+          if (mouseX > TABLE_WIDTH/2)  mouseX = TABLE_WIDTH/2;
 
           if(thisPlayer=="Player2"){
             paddleB.position.x=-mouseX;
@@ -133,6 +157,23 @@
             paddleA.position.x=mouseX;
             socket.emit("paddleAPos",paddleA.position.x);
           } 
+      }
+
+      function ifra(){
+        if (ra < 1.0){
+          fov = 2.0*Math.atan(Math.tan(iniFov/2.0)/ra);
+          fov = (fov*180)/Math.PI;
+        }else{
+          fov = 2.0*Math.asin(0.2); 
+          fov = (fov*180)/Math.PI;
+        }
+      }
+
+      function viewTransform(){
+        scene.translateZ(-SCENE_R*2.0);
+        scene.rotateX(theta);
+        scene.rotateY(-psi);
+        //View = glm::translate(View,-centreEscena);    
       }
 
       window.addEventListener('touchstart', function(event) {
@@ -144,7 +185,10 @@
       });
 
       window.addEventListener('resize', function() {
-          camera.aspect = window.innerWidth / window.innerHeight;
+          ra = window.innerWidth / window.innerHeight;
+          ifra();
+          //camera.fov=fov;
+          camera.aspect = ra;
           camera.updateProjectionMatrix();
           renderer.setSize(window.innerWidth, window.innerHeight);
       });
@@ -155,7 +199,7 @@
       socket.on('join', msg => {
         alert(msg);
         if(msg=="player2"){
-          scene.rotation.set(-70*(Math.PI/180),0,Math.PI);
+          scene.rotateY(Math.PI);
           thisPlayer="Player2"
         }else thisPlayer="Player1";
         document.getElementById("player").innerText=thisPlayer;
@@ -207,6 +251,7 @@
             break;
           default:
         }
+        materialTable.color.setHex(0xffffff);
       }); 
     </script>
   </body>
